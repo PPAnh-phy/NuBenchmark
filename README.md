@@ -14,9 +14,9 @@ Here, $U$ is the PMNS matrix and $V_{CC}=\sqrt{2}G_F N_e$ is the charged-current
 
 The evolution operator and probabilities are
 
-$$
+```math
 S(L,E)=\exp(-iHL),\qquad P_{\alpha\to\beta}=|S_{\beta\alpha}|^2.
-$$
+```
 ---
 Two Hamiltonian methods are available for cross-checking:
 
