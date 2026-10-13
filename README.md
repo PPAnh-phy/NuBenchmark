@@ -14,9 +14,9 @@ Here, $U$ is the PMNS matrix and $V_{CC}=\sqrt{2}G_F N_e$ is the charged-current
 
 The evolution operator and probabilities are
 
-```math
+$$
 S(L,E)=\exp(-iHL),\qquad P_{\alpha\to\beta}=|S_{\beta\alpha}|^2.
-```
+$$
 ---
 Two Hamiltonian methods are available for cross-checking:
 
@@ -45,7 +45,7 @@ Install the Python dependencies in the environment used to run the pipeline:
 python -m pip install numpy scipy matplotlib
 ```
 
-Download the two external repositories of [NuFast-LBL](https://github.com/PeterDenton/NuFast-LBL) and [NuOscProbExact](https://github.com/mbustama/NuOscProbExact). The supplied build and import paths expect the following folders under the same parent directory:
+Download the two external repositories: [NuFast-LBL](https://github.com/PeterDenton/NuFast-LBL) and [NuOscProbExact](https://github.com/mbustama/NuOscProbExact). The supplied build and import paths expect the following folders under the same parent directory:
 - `benchmark_pipeline/`: the Python pipeline files and `nufast_bridge.cpp`.
 - `NuFast-LBL-main/`: including `Benchmarks/src/NuFast_LBL.cpp` and `Benchmarks/include/`.
 - `NuOscProbExact-main/`: including its `src/` directory.
@@ -84,15 +84,32 @@ Both modes use the same **NuFIT 6.0 best-fit values** for the selected mass orde
 
 Harmonised mode compares the absolute differences under matching physical inputs and constants. Native mode also includes differences caused by the packages' numerical conversion and matter conventions. 
 
-NuFast receives squared sines of mixing angles and a CP phase in radians. NuOscProbExact's native angle inputs are sines, obtained from the same squared-sine reference values. 
+NuFast receives squared sines of mixing angles while NuOscProbExact receives sines of mixing angles, obtained from the same squared-sine reference values of NuFIT 6.0. 
 
-These different input sets are defined in `PMNS.py`.
+These different input sets are defined in `PMNS.py` and NuOscProbExact's `globaldefs.py`.
+
+### Oscillation Parameters
+#### Native mode:
+| Implementation | Ordering | $\sin^2\theta_{12}$ | $\sin^2\theta_{13}$ | $\sin^2\theta_{23}$ | $\delta_{\mathrm{CP}}$ | $\Delta m_{21}^2\ [\mathrm{eV}^2]$ | $\Delta m_{31}^2\ [\mathrm{eV}^2]$ |
+|:---------------|:--------:|-------------------:|-------------------:|-------------------:|--------------------------------:|----------------------------------:|----------------------------------:|
+| Hamiltonian | NO | 0.308 | 0.02215 | 0.470 | $212^\circ$ | $7.49\times10^{-5}$ | $2.513\times10^{-3}$ |
+| NuFast | NO | 0.31 | 0.02 | 0.47 | $-0.8\pi$ [rad] | $7.5\times10^{-5}$ | $2.5\times10^{-3}$ |
+| NuExact | NO | 0.310 | 0.02240 | 0.582 | $(212^\circ/180^\circ)\pi$ [rad] | $7.49\times10^{-5}$ | $2.513\times10^{-3}$ |
+| Hamiltonian | IO | 0.308 | 0.02224 | 0.562 | $285^\circ$ | $7.49\times10^{-5}$ | $-2.510\times10^{-3}$ |
+| NuFast | IO | 0.31 | 0.02 | 0.56 | $-0.4\pi$ [rad] | $7.5\times10^{-5}$ | $-2.5\times10^{-3}$ |
+| NuExact | IO | 0.308 | 0.02224 | 0.562 | $(285^\circ/180^\circ)\pi$ [rad] | $7.49\times10^{-5}$ | $-2.510\times10^{-3}$ |
+
+#### Harmonised mode:
+All three implementations receive the same oscillation parameters of the reference Hamiltonian.
+
+### Matter-potential constants and coefficients
+The same logic is applied for matter-potential constants and natural-unit conversion coefficients when native/harmonised mode is selected. One should investigate the differences about this defined in `hamiltonian.py`, `nufast_bridge.cpp`, and `globaldefs.py`.
 
 ## Experiment settings
 The experimental parameters include:
 - Baseline [km]
 - Energy range [GeV] 
-- Density [g/cm³] 
+- Density [g/$\text{cm}^3$] 
 - Electron fraction 
 - Default energy points 
 - Selected flavour channel 
@@ -205,4 +222,3 @@ The Hamiltonian calls `pmns_matrix()` from `PMNS.py` internally. The result has 
 - [NuOscProbExact paper](https://arxiv.org/abs/1904.12391)
 - [NuFIT 6.0](https://arxiv.org/abs/2410.05380, https://www.nu-fit.org/)
 - [Neutrino Formalism](https://arxiv.org/abs/1802.05781v2)
-
