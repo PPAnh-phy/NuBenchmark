@@ -66,7 +66,11 @@ NUFAST_NATIVE_NO = {
 }
 
 NUFAST_NATIVE_IO = {
-    **NUFAST_NATIVE_NO,
+    "s12sq": 0.31,
+    "s13sq": 0.02,
+    "s23sq": 0.56,
+    "delta": -0.4 * np.pi,
+    "dm21": 7.5e-5,
     "dm31": -2.5e-3,
 }
 
