@@ -17,6 +17,7 @@ The evolution operator and probabilities are
 $$
 S(L,E)=\exp(-iHL),\qquad P_{\alpha\to\beta}=|S_{\beta\alpha}|^2.
 $$
+
 ---
 Two Hamiltonian methods are available for cross-checking:
 
@@ -103,13 +104,13 @@ These different input sets are defined in `PMNS.py` and NuOscProbExact's `global
 All three implementations receive the same oscillation parameters of the reference Hamiltonian.
 
 ### Matter-potential constants and coefficients
-The same logic is applied for matter-potential constants and natural-unit conversion coefficients when native/harmonised mode is selected. One should investigate the differences about this defined in `hamiltonian.py`, `nufast_bridge.cpp`, and `globaldefs.py`.
+The same logic is applied for matter-potential constants and natural-unit conversion coefficients when native/harmonised mode is selected. One should investigate the differences about this defined in `hamiltonian.py`, `nufast_bridge.cpp`, and NuOscProbExact's `globaldefs.py`.
 
 ## Experiment settings
 The experimental parameters include:
 - Baseline [km]
 - Energy range [GeV] 
-- Density [g/$\text{cm}^3$] 
+- Density [\$`\text{cm}^3`\$]
 - Electron fraction 
 - Default energy points 
 - Selected flavour channel 
