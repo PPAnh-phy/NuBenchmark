@@ -60,7 +60,7 @@ NUFAST_NATIVE_NO = {
     "s12sq": 0.31,
     "s13sq": 0.02,
     "s23sq": 0.47,
-    "delta": -0.8 * np.pi,
+    "delta": -0.8 * np.pi,    # sin(delta - 2pi) [rad]
     "dm21": 7.5e-5,
     "dm31": 2.5e-3,
 }
@@ -69,9 +69,9 @@ NUFAST_NATIVE_IO = {
     "s12sq": 0.31,
     "s13sq": 0.02,
     "s23sq": 0.56,
-    "delta": -0.4 * np.pi,
+    "delta": -0.4 * np.pi,    # sin(delta - 2pi) [rad]
     "dm21": 7.5e-5,
-    "dm31": -2.5e-3,
+    "dm31": -2.4e-3,    # dm31 = dm32 + dm21, with dm32 = -2.5e-3 and dm21 = 7.5e-5
 }
 
 def nufast_parameters(ordering, mode="harmonised"):
