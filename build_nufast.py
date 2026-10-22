@@ -1,6 +1,6 @@
 """
 Build the two NuFast libraries used by the benchmark from nufast_bridge.cpp:
-    harmonised - Hamiltonian parameter set and conventions
+    common - Hamiltonian parameter set and conventions
     native - original NuFast parameter set and conventions
 """
 
@@ -38,16 +38,31 @@ else:
     PLATFORM_FLAGS = ["-shared", "-fPIC"]
 
 
-def build(mode):
-    output = HERE / f"{PREFIX}nufast_{mode}{SUFFIX}"
-    command = [GPP, "-O3", "-std=gnu++17", *PLATFORM_FLAGS, "-I", str(INCLUDE)]
-    if mode == "harmonised":
-        command.append("-DNUFAST_HARMONISED=1")
-    command += [str(BRIDGE), str(SRC), "-o", str(output)]
+def build(vcc_mode):
+    macros = {"common": "NUFAST_VCC_COMMON", "native": "NUFAST_VCC_NATIVE"}
+    if vcc_mode not in macros:
+        raise ValueError("vcc_mode must be 'common' or 'native'")
+
+    output = HERE / f"{PREFIX}nufast_{vcc_mode}{SUFFIX}"
+
+    command = [
+        GPP,
+        "-O3",
+        "-std=gnu++17",
+        *PLATFORM_FLAGS,
+        "-I",
+        str(INCLUDE),
+        f"-D{macros[vcc_mode]}=1",
+        str(BRIDGE),
+        str(SRC),
+        "-o",
+        str(output),
+    ]
+
     print(f"Building {output.name} ...")
     subprocess.run(command, check=True)
     print(f"Created {output.name}")
 
 
-for mode in ("harmonised", "native"):
-    build(mode)
+for vcc_mode in ("common", "native"):
+    build(vcc_mode)
