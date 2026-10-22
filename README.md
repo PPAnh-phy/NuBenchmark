@@ -36,7 +36,7 @@ Both solve the same constant-density problem and return the same array layout. N
 | `Plot.py` | Visualise the results by plots |
 | `pipeline.py` | Command-line interface and result saving |
 | `nufast_bridge.cpp` | Connects the NuFast C++ calculation to Python |
-| `build_nufast.py` | Builds the harmonised and native NuFast libraries |
+| `build_nufast.py` | Builds the common and native NuFast libraries |
 
 ## Installation
 
@@ -63,11 +63,11 @@ python build_nufast.py
 
 This builds both libraries:
 
-| Platform | Harmonised library | Native library |
+| Platform | Common library | Native library |
 |---|---|---|
-| Windows | `nufast_harmonised.dll` | `nufast_native.dll` |
-| Linux | `libnufast_harmonised.so` | `libnufast_native.so` |
-| macOS | `libnufast_harmonised.dylib` | `libnufast_native.dylib` |
+| Windows | `nufast_common.dll` | `nufast_native.dll` |
+| Linux | `libnufast_common.so` | `libnufast_native.so` |
+| macOS | `libnufast_common.dylib` | `libnufast_native.dylib` |
 
 Build the libraries on the platform where they will run. Rebuild after changing the bridge, its constants, or the NuFast source. The benchmark selects the appropriate library through `--mode`.
 
@@ -75,15 +75,17 @@ On Windows, `py` can replace `python` in these commands. On Linux or macOS, use 
 
 ## Benchmark modes
 
-Both modes use the same **NuFIT 6.0 best-fit values** for the selected mass ordering, together with the same baseline, energy grid, density, and electron fraction.
+Both modes use the same **NuFIT 6.0 best-fit values** for the selected mass ordering, together with the same baseline, energy grid, density, and electron fraction. 
 
-| Setting | `harmonised` | `native` |
+These two modes are applied separately for oscillation parameters `ocspars` and matter-potential coefficients `Vcc`. 
+
+| Setting | `common` | `native` |
 |---|---|---|
 | Oscillation parameters | Shared reference values | Each package's input style |
 | Natural-unit conversion | Hamiltonian conventions for all computators | Each package's own conventions |
 | Matter coefficient | Hamiltonian coefficient for all calculators | Each package's own coefficient |
 
-Harmonised mode compares the absolute differences under matching physical inputs and constants. Native mode also includes differences caused by the packages' numerical conversion and matter conventions. 
+Common mode compares the absolute differences under matching physical inputs and constants. Native mode also includes differences caused by the packages' numerical conversion and matter conventions. 
 
 NuFast receives squared sines of mixing angles while NuOscProbExact receives sines of mixing angles, obtained from the same squared-sine reference values of NuFIT 6.0. 
 
@@ -100,11 +102,11 @@ These different input sets are defined in `PMNS.py` and NuOscProbExact's `global
 | NuFast | IO | 0.31 | 0.02 | 0.56 | $-0.4\pi$ [rad] | $7.5\times10^{-5}$ | $-2.5\times10^{-3}$ |
 | NuExact | IO | 0.308 | 0.02224 | 0.562 | $(285^\circ/180^\circ)\pi$ [rad] | $7.49\times10^{-5}$ | $-2.510\times10^{-3}$ |
 
-#### Harmonised mode:
+#### Common mode:
 All three implementations receive the same oscillation parameters of the reference Hamiltonian.
 
 ### Matter-potential constants and coefficients
-The same logic is applied for matter-potential constants and natural-unit conversion coefficients when native/harmonised mode is selected. One should investigate the differences about this defined in `hamiltonian.py`, `nufast_bridge.cpp`, and NuOscProbExact's `globaldefs.py`.
+The same logic is applied for matter-potential constants and natural-unit conversion coefficients when native/common mode is selected. One should investigate the differences about this defined in `hamiltonian.py`, `nufast_bridge.cpp`, and NuOscProbExact's `globaldefs.py`.
 
 ## Experiment settings
 The experimental parameters include:
@@ -115,6 +117,7 @@ The experimental parameters include:
 - Default energy points 
 - Selected flavour channel 
 
+Here we use Electron fraction \$`Ye = 0.5`\$ and Matter density \&`\rho = 2.825~\text{cm}^3`\$
 Change `PMNS_PARAMETERS` or `EXPERIMENTS` in `PMNS.py` to change the shared physics settings. The `alpha` and `beta` entries select the channel shown and saved by the benchmark.
 
 ## Running the benchmark
@@ -122,18 +125,20 @@ Change `PMNS_PARAMETERS` or `EXPERIMENTS` in `PMNS.py` to change the shared phys
 Run commands from the pipeline directory. For example:
 
 ```bash
-python pipeline.py --mode harmonised --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
+py pipeline.py --oscpars native --Vcc common --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
 ```
 
 ```bash
-python pipeline.py --mode native --experiment DUNE --ordering IO --particle nu --medium matter --hamiltonian-method expm --show
+py pipeline.py --oscpars native --Vcc native --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
+
 ```
 
 For a vacuum calculation, use `--medium vacuum`.
 
 | Option | Values or meaning | Default |
 |---|---|---|
-| `--mode` | `harmonised`, `native` | `harmonised` |
+| `--oscpars` | `common`, `native` | `common` |
+| `--Vcc` | `common`, `native` | `common` |
 | `--experiment` | `JUNO`, `DUNE` | `DUNE` |
 | `--ordering` | `NO`, `IO` | `NO` |
 | `--particle` | `nu`, `antinu` | `nu` |
@@ -145,23 +150,18 @@ For a vacuum calculation, use `--medium vacuum`.
 | `--show` | Display plots as well as saving them | Off |
 | `--all` | Run every experiment/ordering/particle/medium combination | Off |
 
-To run all 16 combinations for one mode and Hamiltonian method:
-
-```bash
-python pipeline.py --all --mode harmonised --hamiltonian-method eigh
-```
-
-Repeat with `--mode native` or `--hamiltonian-method expm` as needed.
 
 ## Results
 
-Each run creates a new timestamped directory under the output folder. Repeating a calculation keeps earlier results. 
+Each run creates a new timestamped directory under the output folder. Repeating a calculation keeps earlier results.
 
-Each case produces a CSV file and a PNG plot. Filenames identify the experiment, ordering, particle, medium, mode, and Hamiltonian method, for example:
+Each case produces a CSV file and a PNG plot. These CSV and PNG output files are also saved in separate folders `_csv` and `_png`. 
+
+Filenames identify the experiment, ordering, particle, medium, mode, and Hamiltonian method, for example:
 
 ```text
-JUNO_NO_antinu_matter_harmonised_eigh.csv
-JUNO_NO_antinu_matter_harmonised_eigh.png
+JUNO_NO_antinu_matter_common_eigh.csv
+JUNO_NO_antinu_matter_common_eigh.png
 ```
 
 The CSV contains the energy, the selected-channel probability from each calculator, and three absolute differences:
