@@ -1,6 +1,6 @@
 """
 Define the PMNS matrix and experimental parameters for neutrino oscillation probability calculations.
-The PMNS paramerters follow the NuFIT 6.0 best-fit values.
+The PMNS parameters follow the NuFIT 6.0 best-fit values.
 """
 import numpy as np
 
@@ -42,7 +42,7 @@ def dm31(ordering):
 
 
 def reference_parameters(ordering):
-    """Shared parameter set for harmonised mode"""
+    """Shared parameter set for common mode"""
     ordering = ordering.upper()
     p = PMNS_PARAMETERS[ordering]
 
@@ -74,14 +74,14 @@ NUFAST_NATIVE_IO = {
     "dm31": -2.4e-3,    # dm31 = dm32 + dm21, with dm32 = -2.5e-3 and dm21 = 7.5e-5
 }
 
-def nufast_parameters(ordering, mode="harmonised"):
+def nufast_parameters(ordering, mode="common"):
     ordering = ordering.upper()
     mode = mode.lower()
 
     if ordering not in {"NO", "IO"}:
         raise ValueError("ordering must be 'NO' or 'IO'")
 
-    if mode == "harmonised":
+    if mode == "common":
         return reference_parameters(ordering)
 
     if mode == "native":
@@ -92,17 +92,17 @@ def nufast_parameters(ordering, mode="harmonised"):
         )
         return dict(source)
 
-    raise ValueError("mode must be 'harmonised' or 'native'")
+    raise ValueError("mode must be 'common' or 'native'")
 
 
-def nuexact_parameters(ordering, mode="harmonised", gd=None):
+def nuexact_parameters(ordering, mode="common", gd=None):
     ordering = ordering.upper()
     mode = mode.lower()
 
     if ordering not in {"NO", "IO"}:
         raise ValueError("ordering must be 'NO' or 'IO'")
 
-    if mode == "harmonised":
+    if mode == "common":
         p = reference_parameters(ordering)
 
         return {
@@ -133,7 +133,7 @@ def nuexact_parameters(ordering, mode="harmonised", gd=None):
             "dm31": getattr(gd, f"D31_{suffix}"),
         }
 
-    raise ValueError("mode must be 'harmonised' or 'native'")
+    raise ValueError("mode must be 'common' or 'native'")
 
 
 # Physical configurations
