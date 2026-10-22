@@ -1,48 +1,25 @@
-"""Command-line entry point for the neutrino probability benchmark.
+"""
+Settings:
+    --oscpars common : Use reference oscillation parameters in all programs.
+    --oscpars native : Use each program's native oscillation parameters.
+    --Vcc common     : Use the reference matter conversion in all programs.
+    --Vcc native     : Use each program's native matter conversion.
 
-General syntax
---------------
-py pipeline.py 
-    --mode <harmonised|native> --hamiltonian-method <eigh|expm>
-    --experiment <JUNO|DUNE> --ordering <NO|IO>
-    --particle <nu|antinu> --medium <vacuum|matter>
+Examples:
+py pipeline.py --oscpars common --Vcc common --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
+py pipeline.py --oscpars common --Vcc native --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
+py pipeline.py --oscpars native --Vcc common --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
+py pipeline.py --oscpars native --Vcc native --experiment JUNO --ordering NO --particle antinu --medium matter --hamiltonian-method eigh --show
 
-Enter the command on one line. The line breaks above are for readability.
-On Linux/macOS, replace "py" with "python3".
+# Display all available options:
+py pipeline.py --help
 
-Benchmark modes
----------------
-harmonised: 
-    Every method is benchmark with the same oscillation parameters and natural-unit conventions and matter-potential coefficient of the Hamiltonian, follow NuFIT 6.0 values.
-    The parameter set and conventions expressed in the Hamiltonian prefer precision over computational efficiency.
-native:
-    The parameters also follow NuFIT 6.0 values, while each package's own input style and natural-unit conventions and matter-potential coefficient remain.
-    We want to see the effect on precision of the results from each package's own parameters and conventions expression.
-
-Hamiltonian methods
--------------------
-eigh: Numerical Hermitian diagonalisation (default).
-expm: Matrix exponential using scipy.linalg.expm.
-
-Optional arguments
-------------------
---points N       Number of energy samples; default: experiment setting.
---n-newton N     NuFast matter eigenvalue refinement; default: 2.
---output DIR     Output root directory; default: results.
---show           Display plots after a run.
---all            Run every combination of experiment, ordering, particle and medium for the selected mode and Hamiltonian method.
-
-Examples
---------
-py pipeline.py --mode harmonised --hamiltonian-method eigh --experiment JUNO --ordering NO --particle antinu --medium matter --show
-py pipeline.py --mode native --hamiltonian-method expm --experiment JUNO --ordering IO --particle antinu --medium vacuum --show
-py pipeline.py --mode harmonised --hamiltonian-method expm --experiment DUNE --ordering NO --particle nu --medium matter --show
-py pipeline.py --mode native --hamiltonian-method eigh --experiment DUNE --ordering IO --particle antinu --medium matter --show
-py pipeline.py --all --mode harmonised --hamiltonian-method expm
+Use python or python3 instead of py depending on your system configuration.
 """
 from pathlib import Path
 import argparse
 from datetime import datetime
+import shutil
 import numpy as np
 
 from PMNS import FLAVOR_NAMES, pmns_unitarity
@@ -50,9 +27,9 @@ from benchmark import run_case
 from plot import plot_result
 
 
-def case_name(experiment, ordering, particle, medium, mode):
+def case_name(experiment, ordering, particle, medium, oscpars, vcc):
     """Return the output stem for one benchmark case."""
-    return (f"{experiment}_{ordering}_{particle}_{medium}_{mode}")
+    return (f"{experiment}_{ordering}_{particle}_{medium}_oscpars-{oscpars}_Vcc-{vcc}")
 
 
 def save_probabilities(result, path):
@@ -88,32 +65,27 @@ def print_summary(result):
         f'{result["ordering"]} | '
         f'{result["particle"]} | '
         f'{result["medium"]} | '
-        f'{result["mode"]} | '
         f'P({alpha}->{beta})'
     )
     print(f'Hamiltonian solver: {result["hamiltonian_method"]}')
 
-    if result["mode"] == "harmonised":
-        print(
-            "  max numerical difference of probabilities |NuOscProbExact - Hamiltonian| = "
-            f'{result["diff_NuOscProbExact"].max():.6e}'
-        )
-        print(
-            "  max numerical difference of probabilities |NuFast - Hamiltonian|         = "
-            f'{result["diff_NuFast"].max():.6e}'
-        )
-    else:
-        print(
-            "  max numerical difference of probabilities |NuOscProbExact - Hamiltonian| = "
-            f'{result["diff_NuOscProbExact"].max():.6e}'
-        )
-        print(
-            "  max numerical difference of probabilities |NuFast - Hamiltonian|         = "
-            f'{result["diff_NuFast"].max():.6e}'
-        )
+    print(
+        f'  Settings: oscpars={result["oscpars"]}, '
+        f'Vcc={result["Vcc"]}'
+    )
 
     print(
-        "  max numerical difference of probabilities |NuFast - NuOscProbExact|      = "
+        "  max absolute probability difference |NuOscProbExact - Hamiltonian| = "
+        f'{result["diff_NuOscProbExact"].max():.6e}'
+    )
+
+    print(
+        "  max absolute probability difference |NuFast - Hamiltonian| = "
+        f'{result["diff_NuFast"].max():.6e}'
+    )
+
+    print(
+        "  max absolute probability difference |NuFast - NuOscProbExact| = "
         f'{result["diff_NuFast_NuOscProbExact"].max():.6e}'
     )
 
@@ -126,7 +98,7 @@ def print_summary(result):
 
 
 def run_one(experiment, ordering, particle, medium, args):
-    name = case_name(experiment, ordering, particle, medium, args.mode)
+    name = case_name(experiment, ordering, particle, medium, args.oscpars, args.vcc)
     name = f"{name}_{args.hamiltonian_method}"
     out = Path(args.output)
     result = run_case(
@@ -137,11 +109,29 @@ def run_one(experiment, ordering, particle, medium, args):
         hamiltonian_method=args.hamiltonian_method,
         n_newton=args.n_newton,
         n_energy=args.points,
-        mode=args.mode,
+        oscpars=args.oscpars,
+        Vcc=args.vcc,
     )
     print_summary(result)
-    save_probabilities(result, out / f"{name}.csv")
-    plot_result(result, out / f"{name}.png", show=args.show)
+
+    # Both files in the timestamp folder.
+    csv_path = out / f"{name}.csv"
+    png_path = out / f"{name}.png"
+
+    save_probabilities(result, csv_path)
+    plot_result(result, png_path, show=args.show)
+
+    # Seperate folders for all CSV and PNG results
+    csv_dir = out.parent / "_csv"
+    png_dir = out.parent / "_png"
+
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    png_dir.mkdir(parents=True, exist_ok=True)
+
+    run_id = out.name
+    shutil.copy2(csv_path, csv_dir / f"{run_id}_{name}.csv")
+    shutil.copy2(png_path, png_dir / f"{run_id}_{name}.png")
+
     print()
 
 
@@ -150,16 +140,8 @@ def main():
         description=("Benchmark a three-flavour Hamiltonian solver against NuOscProbExact and NuFast-LBL.")
     )
 
-    parser.add_argument(
-        "--mode",
-        choices=["harmonised", "native"],
-        default="harmonised",
-        help=(
-            "harmonised: all methods use the Hamiltonian's parameter and unit conventions; "
-            "native: same NuFIT 6.0 physics values, but each package keeps its own input/unit/matter convention"
-        ),
-    )
-
+    parser.add_argument("--oscpars", choices=["common", "native"], default="common", help="Oscillation-parameter selection.")
+    parser.add_argument("--Vcc", dest="vcc", choices=["common", "native"], default="common", help="Matter-potential conversion selection.")
     parser.add_argument("--experiment", choices=["JUNO", "DUNE"], default="DUNE")
     parser.add_argument("--ordering", choices=["NO", "IO"], default="NO")
     parser.add_argument("--particle", choices=["nu", "antinu"], default="nu")
