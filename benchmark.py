@@ -15,9 +15,21 @@ from hamiltonian import (
     KM_TO_INV_EV as REF_KM_TO_INV_EV,
 )
 
+
 # Hamiltonian adapter
 def hamiltonian_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, antineutrino=False, method="eigh"):
     return oscillation_probabilities(L=L, E=E, ordering=ordering, rho=rho, Ye=Ye, matter=matter, antineutrino=antineutrino, method=method)
+
+
+# Mode validation
+def _validate_mode(value, name):
+    value = value.lower()
+    if value not in {"common", "native"}:
+        raise ValueError(
+            f"{name} must be 'common' or 'native'"
+        )
+    return value
+
 
 # Call NuOscProbExact
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -36,61 +48,42 @@ import hamiltonians3nu
 import oscprob3nu
 
 # NuOscProbExact adapter
-def nuexact_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, antineutrino=False, mode="harmonised"):
-    mode = mode.lower()
-    if mode not in {"harmonised", "native"}:
-        raise ValueError("mode must be 'harmonised' or 'native'")
+def nuexact_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, antineutrino=False, oscpars="common", Vcc="common"):
+    oscpars = _validate_mode(oscpars, "oscpars")
+    Vcc = _validate_mode(Vcc, "Vcc")
 
     E = np.atleast_1d(np.asarray(E, dtype=float))
     E_eV = E * 1.0e9
-    p = nuexact_parameters(ordering, mode=mode, gd=nuexact_gd)
+    p = nuexact_parameters(ordering, mode=oscpars, gd=nuexact_gd)
     delta = -p["delta"] if antineutrino else p["delta"]
 
-    if mode == "harmonised":
-        H0 = hamiltonians3nu.hamiltonian_3nu_vacuum_energy_independent(
-            p["s12"],
-            p["s23"],
-            p["s13"],
-            delta,
-            p["dm21"],
-            p["dm31"],
-            angles=p["angles"],
-        )
+    H0 = hamiltonians3nu.hamiltonian_3nu_vacuum_energy_independent(
+        p["s12"],
+        p["s23"],
+        p["s13"],
+        delta,
+        p["dm21"],
+        p["dm31"],
+        angles=p["angles"],
+    )
 
-        L_eVinv = float(L) * REF_KM_TO_INV_EV
+    L_eVinv = float(L) * REF_KM_TO_INV_EV
 
-        if matter:
-            Vcc = reference_matter_potential(rho, Ye)
-            if antineutrino:
-                Vcc = -Vcc
-            H = hamiltonians3nu.hamiltonian_3nu_matter(H0, E_eV, Vcc)
+    if matter:
+        if Vcc == "common":
+            potential = reference_matter_potential(rho, Ye)
         else:
-            H = H0 / E_eV[:, None, None]
+            potential = nuexact_earth.matter_potential(float(rho), float(Ye))
 
+        if antineutrino:
+            potential = -potential
+
+        H = hamiltonians3nu.hamiltonian_3nu_matter(H0, E_eV, potential)
     else:
-        H0 = hamiltonians3nu.hamiltonian_3nu_vacuum_energy_independent(
-            p["s12"],
-            p["s23"],
-            p["s13"],
-            delta,
-            p["dm21"],
-            p["dm31"],
-            angles=p["angles"],
-        )
-
-        L_eVinv = float(L) * nuexact_gd.CONV_KM_TO_INV_EV
-
-        if matter:
-            Vcc = nuexact_earth.matter_potential(float(rho), float(Ye))
-            if antineutrino:
-                Vcc = -Vcc
-            H = hamiltonians3nu.hamiltonian_3nu_matter(H0, E_eV, Vcc)
-        else:
-            H = H0 / E_eV[:, None, None]
+        H = H0 / E_eV[:, None, None]
 
     P = np.asarray(oscprob3nu.probabilities_3nu(H, L_eVinv))
 
-    # Current NuOscProbExact returns (..., 9) for a batched scan.
     return P.reshape(-1, 3, 3)
 
 
@@ -101,12 +94,12 @@ _DOUBLE_PTR = ctypes.POINTER(ctypes.c_double)
 
 def _library_name(mode):
     mode = mode.lower()
-    if mode == "harmonised":
-        base = "nufast_harmonised"
+    if mode == "common":
+        base = "nufast_common"
     elif mode == "native":
         base = "nufast_native"
     else:
-        raise ValueError("mode must be 'harmonised' or 'native'")
+        raise ValueError("mode must be 'common' or 'native'")
 
     if sys.platform.startswith("win"):
         return f"{base}.dll"
@@ -193,14 +186,22 @@ def _load_nufast(mode):
     _NUFAST[mode] = lib
     return lib
 
-def nufast_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, antineutrino=False, n_newton=2, mode="harmonised"):
-    mode = mode.lower()
-    lib = _load_nufast(mode)
-    p = nufast_parameters(ordering, mode=mode)
-    energies = np.ascontiguousarray(np.atleast_1d(np.asarray(E, dtype=float)), dtype=np.float64) 
-    # NuFast convention: negative E denotes antineutrinos.
+def nufast_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, antineutrino=False, n_newton=2, oscpars="common", Vcc="common"):
+    oscpars = oscpars.lower()
+    Vcc = Vcc.lower()
+
+    if oscpars not in {"common", "native"}:
+        raise ValueError("oscpars must be 'common' or 'native'")
+    if Vcc not in {"common", "native"}:
+        raise ValueError("Vcc must be 'common' or 'native'")
+
+    p = nufast_parameters(ordering, mode=oscpars)
+    lib = _load_nufast(Vcc)
+    energies = np.ascontiguousarray(np.atleast_1d(np.asarray(E, dtype=float)), dtype=np.float64)
+
     if antineutrino:
         energies = -energies
+
     out = np.empty((energies.size, 3, 3), dtype=np.float64)
 
     common = (
@@ -210,15 +211,23 @@ def nufast_probabilities(L, E, ordering="NO", rho=0.0, Ye=0.5, matter=True, anti
         p["delta"],
         p["dm21"],
         p["dm31"],
-        float(L),
+        float(L),  # Physical baseline; no rescaling.
         energies.ctypes.data_as(_DOUBLE_PTR),
         int(energies.size),
     )
 
     if matter:
-        lib.nufast_matter(*common, float(rho * Ye), int(n_newton), out.ctypes.data_as(_DOUBLE_PTR))
+        lib.nufast_matter(
+            *common,
+            float(rho * Ye),
+            int(n_newton),
+            out.ctypes.data_as(_DOUBLE_PTR),
+        )
     else:
-        lib.nufast_vacuum(*common, out.ctypes.data_as(_DOUBLE_PTR))
+        lib.nufast_vacuum(
+            *common,
+            out.ctypes.data_as(_DOUBLE_PTR),
+        )
 
     return out
 
@@ -231,7 +240,8 @@ def run_case(
     medium="matter",
     n_newton=2,
     n_energy=None,
-    mode="harmonised",
+    oscpars="common",
+    Vcc="common",
     hamiltonian_method="eigh",
 ):
 
@@ -239,7 +249,8 @@ def run_case(
     ordering = ordering.upper()
     particle = particle.lower()
     medium = medium.lower()
-    mode = mode.lower()
+    oscpars = oscpars.lower()
+    Vcc = Vcc.lower()
 
     hamiltonian_method = hamiltonian_method.lower()
     if hamiltonian_method not in {"eigh", "expm"}:
@@ -251,8 +262,11 @@ def run_case(
     if medium not in {"vacuum", "matter"}:
         raise ValueError("medium must be 'vacuum' or 'matter'")
 
-    if mode not in {"harmonised", "native"}:
-        raise ValueError("mode must be 'harmonised' or 'native'")
+    if oscpars not in {"common", "native"}:
+        raise ValueError("oscpars must be 'common' or 'native'")
+    
+    if Vcc not in {"common", "native"}:
+        raise ValueError("Vcc must be 'common' or 'native'")
 
     cfg = experiment(experiment_name, n_energy=n_energy)
 
@@ -267,8 +281,8 @@ def run_case(
     beta = cfg["beta"]
 
     P_ref = hamiltonian_probabilities(L, E, ordering=ordering, rho=rho, Ye=Ye, matter=use_matter, antineutrino=anti, method=hamiltonian_method)
-    P_exact = nuexact_probabilities(L, E, ordering=ordering, rho=rho, Ye=Ye, matter=use_matter, antineutrino=anti, mode=mode)
-    P_fast = nufast_probabilities(L, E, ordering=ordering, rho=rho, Ye=Ye, matter=use_matter, antineutrino=anti, n_newton=n_newton, mode=mode)
+    P_exact = nuexact_probabilities(L, E, ordering=ordering, rho=rho, Ye=Ye, matter=use_matter, antineutrino=anti, oscpars=oscpars, Vcc=Vcc)
+    P_fast = nufast_probabilities(L, E, ordering=ordering, rho=rho, Ye=Ye, matter=use_matter, antineutrino=anti, n_newton=n_newton, oscpars=oscpars, Vcc=Vcc)
 
     ref = P_ref[:, alpha, beta]
     exact = P_exact[:, alpha, beta]
@@ -279,7 +293,9 @@ def run_case(
         "ordering": ordering,
         "particle": particle,
         "medium": medium,
-        "mode": mode,
+        "oscpars": oscpars,
+        "Vcc": Vcc,
+        "phase_conversion": "common",
         "hamiltonian_method": hamiltonian_method,
         "L": L,
         "rho": rho,
